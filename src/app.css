@@ -1,0 +1,41 @@
+:root {
+	--primary-rgb: 204, 255, 0;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.skeleton {
+	@apply animate-pulse rounded bg-zinc-800/50;
+}
+
+.card-hover {
+	@apply transition-all duration-300;
+}
+
+.card-hover:hover {
+	@apply -translate-y-1 shadow-lg shadow-black/50;
+}
+
+.scroll-hidden {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+.scroll-hidden::-webkit-scrollbar {
+	display: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
+.no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+.field-sizing-content {
+	field-sizing: content;
+}

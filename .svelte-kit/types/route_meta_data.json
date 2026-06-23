@@ -1,0 +1,33 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/anime": [
+		"src/routes/+layout.ts"
+	],
+	"/anime/[id]": [
+		"src/routes/+layout.ts"
+	],
+	"/anime/[id]/watch": [
+		"src/routes/+layout.ts"
+	],
+	"/home": [
+		"src/routes/+layout.ts"
+	],
+	"/my-list": [
+		"src/routes/+layout.ts"
+	],
+	"/schedule": [
+		"src/routes/+layout.ts"
+	],
+	"/search": [
+		"src/routes/+layout.ts"
+	],
+	"/settings": [
+		"src/routes/+layout.ts"
+	],
+	"/watch/[slug]": [
+		"src/routes/+layout.ts"
+	]
+}

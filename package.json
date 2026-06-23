@@ -1,0 +1,31 @@
+{
+  "name": "anito",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "hls.js": "^1.6.16",
+    "motion": "^11.18.2",
+    "plyr": "^3.8.4"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.66.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.15",
+    "svelte": "^5.56.3",
+    "svelte-check": "^4.6.0",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16"
+  },
+  "type": "module"
+}

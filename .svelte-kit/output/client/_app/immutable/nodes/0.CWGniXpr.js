@@ -1,0 +1,1 @@
+import{C as e,L as t,Q as n,Z as r,h as i,x as a}from"../chunks/B2mK20LP.js";import"../chunks/xihTtKlq.js";var o=n({}),s=e(`<div class="flex min-h-[100dvh] flex-col bg-[#050505]"><main class="flex-1"><!></main></div>`);function c(e,n){var o=s(),c=t(o);i(t(c),()=>n.children),r(c),r(o),a(e,o)}export{c as component,o as universal};
