@@ -1,4 +1,9 @@
 import type { Anime, Episode, ContinueWatchingItem, LatestEpisodeItem } from './types';
+import {
+	mockAnimeList, mockOngoing, mockTrending, mockLatestEpisodes,
+	mockContinueWatching, mockGenres, mockSchedule,
+	getMockDetail, searchMockAnime, getMockEpisodeDetail,
+} from './mock';
 
 export type { Anime, Episode, ContinueWatchingItem, LatestEpisodeItem };
 
@@ -30,28 +35,57 @@ export function getAnimeById(id: string): Anime | undefined {
 }
 
 export async function initStore(): Promise<void> {
+	if (storeState.initialized) return;
+
+	animeList.length = 0;
+	animeList.push(...mockAnimeList);
+
+	ongoing.length = 0;
+	ongoing.push(...mockOngoing);
+
+	trending.length = 0;
+	trending.push(...mockTrending);
+
+	latestEpisodes.length = 0;
+	latestEpisodes.push(...mockLatestEpisodes);
+
+	continueWatching.length = 0;
+	continueWatching.push(...mockContinueWatching);
+
+	genres.length = 0;
+	genres.push(...mockGenres);
+
 	storeState.initialized = true;
 }
 
-export async function fetchAnimeDetail(_slug: string): Promise<Anime | null> {
-	return null;
+export async function fetchAnimeDetail(slug: string): Promise<Anime | null> {
+	const detail = getMockDetail(slug);
+	if (!detail) return null;
+
+	const existing = animeList.findIndex(a => a.id === detail.id);
+	if (existing >= 0) {
+		animeList[existing] = detail;
+	} else {
+		animeList.push(detail);
+	}
+	return detail;
 }
 
-export async function searchAnime(_query: string): Promise<Anime[]> {
-	return [];
+export async function searchAnime(query: string): Promise<Anime[]> {
+	return searchMockAnime(query);
 }
 
 export async function fetchSchedule(): Promise<{ day: string; anime_list: { title: string; slug: string; poster: string }[] }[]> {
-	return [];
+	return mockSchedule;
 }
 
 export async function fetchStreamUrl(_serverId: string): Promise<{ url: string }> {
-	return { url: '' };
+	return { url: 'https://www.youtube.com/embed/dQw4w9WgXcQ' };
 }
 
-export async function fetchEpisodeDetail(_episodeId: string): Promise<{
+export async function fetchEpisodeDetail(episodeId: string): Promise<{
 	servers: { name: string; url: string }[];
 	streamUrl?: string;
 } | null> {
-	return null;
+	return getMockEpisodeDetail(episodeId);
 }
