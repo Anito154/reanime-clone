@@ -1,41 +1,23 @@
 :root {
-	--primary-rgb: 204, 255, 0;
+	--primary: #aec9e4;
+	--primary-rgb: 174, 201, 228;
+	--ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+html { background: #000; }
+
 .skeleton {
 	@apply animate-pulse rounded bg-zinc-800/50;
 }
 
-.card-hover {
-	@apply transition-all duration-300;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-.card-hover:hover {
-	@apply -translate-y-1 shadow-lg shadow-black/50;
-}
-
-.scroll-hidden {
-	-ms-overflow-style: none;
-	scrollbar-width: none;
-}
-
-.scroll-hidden::-webkit-scrollbar {
-	display: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-	display: none;
-}
-
-.no-scrollbar {
-	-ms-overflow-style: none;
-	scrollbar-width: none;
-}
-
-.field-sizing-content {
-	field-sizing: content;
-}
+.field-sizing-content { field-sizing: content; }

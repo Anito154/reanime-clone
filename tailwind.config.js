@@ -4,18 +4,12 @@ export default {
 	theme: {
 		extend: {
 			colors: {
-				'bg': '#050505',
-				'card': '#0a0a0a',
+				card: '#0a0a0a',
 				'card-background': '#0a0a0a',
-				'surface': '#050505',
 				primary: {
-					DEFAULT: '#ccff00',
+					DEFAULT: '#aec9e4',
 					foreground: '#000000'
-				},
-				'accent-primary': '#ccff00',
-				'accent-secondary': '#00ccff',
-				'text-muted': '#a1a1aa',
-				'text-primary': '#ffffff'
+				}
 			},
 			keyframes: {
 				'fade-in': {

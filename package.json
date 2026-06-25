@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --host",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
@@ -16,7 +16,6 @@
     "plyr": "^3.8.4"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.66.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "autoprefixer": "^10.5.0",

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { animeList, getAnimeById } from '$lib/data/mock';
-	import { myList, type ListStatus, type MyListItem } from '$lib/myList.svelte';
-	import type { Anime } from '$lib/data/mock';
+import { animeList, getAnimeById } from '$lib/data/store.svelte';
+import { myList, type ListStatus, type MyListItem } from '$lib/myList.svelte';
+import type { Anime } from '$lib/data/store.svelte';
 
 	const statusTabs: { value: ListStatus | 'all'; label: string }[] = [
 		{ value: 'all', label: 'All' },
@@ -116,7 +116,7 @@
 								</div>
 								<div class="mt-2 px-0.5">
 									<h3 class="truncate text-xs font-semibold text-white group-hover:text-accent-primary transition-colors">{anime.title}</h3>
-									<p class="mt-0.5 text-[10px] text-zinc-500">{anime.year} &middot; {anime.episodes.length} ep</p>
+									<p class="mt-0.5 text-[10px] text-zinc-500">{anime.year} &middot; {anime.totalEpisodes || anime.episodes.length} ep</p>
 								</div>
 							</a>
 							<div class="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

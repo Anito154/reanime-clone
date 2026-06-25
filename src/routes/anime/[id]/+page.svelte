@@ -1,12 +1,22 @@
 <script lang="ts">
-	import { animeList } from '$lib/data/mock';
 	import { page } from '$app/state';
 	import ShareDialog from '$lib/components/ShareDialog.svelte';
 	import { myList, type ListStatus } from '$lib/myList.svelte';
+	import { fetchAnimeDetail, animeList } from '$lib/data/store.svelte';
+	import type { Anime } from '$lib/data/store.svelte';
+	import { onMount } from 'svelte';
 
-	let anime = $derived(animeList.find(a => a.id === page.params.id));
+	let anime = $state<Anime | null>(null);
 	let isLoaded = $state(false);
 	let descExpanded = $state(false);
+
+	onMount(async () => {
+		if (page.params.id) {
+			const detail = await fetchAnimeDetail(page.params.id);
+			anime = detail;
+			isLoaded = true;
+		}
+	});
 	let showShareDialog = $state(false);
 	let listDropdownOpen = $state(false);
 
@@ -70,12 +80,11 @@
 		}
 	});
 
-	let relatedAnime = $derived(
-		anime ? animeList
-			.filter(a => a.id !== anime.id && a.genres.some(g => anime.genres.includes(g)))
-			.slice(0, 6)
-		: []
-	);
+	let relatedAnime = $derived.by(() => {
+		const a = anime;
+		if (!a) return [];
+		return animeList.filter(b => b.id !== a.id && b.genres.some(g => a.genres.includes(g))).slice(0, 6);
+	});
 
 </script>
 
@@ -161,7 +170,7 @@
 
 							<!-- Action Buttons -->
 							<div class="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-								<a href="/anime/{anime.id}/watch" class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-black shadow transition-all hover:brightness-110">
+								<a href="/watch/{anime.id}?ep=1" class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-black shadow transition-all hover:brightness-110">
 									<svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
 									Watch Now
 								</a>

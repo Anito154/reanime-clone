@@ -1,12 +1,12 @@
 <script lang="ts">
 	import {
-		animeList,
-		newOnSite,
-		latestEpisodes,
-		continueWatching,
-		upcomingAnime,
-		getAnimeById
-	} from '$lib/data/mock';
+	animeList,
+	ongoing,
+	latestEpisodes,
+	continueWatching as cwItems,
+	getAnimeById,
+	trending
+} from '$lib/data/store.svelte';
 
 	interface HeroSlide {
 		title: string;
@@ -34,63 +34,34 @@
 		progress: number;
 	}
 
-	const heroSlides: HeroSlide[] = [
-		{
-			title: 'That Time I Got Reincarnated as a Slime Season 4',
-			desc: "The fourth season of Tensei Shitara Slime Datta Ken. Demon Lord Rimuru's dream of creating an alliance between humans and monsters takes a step closer to being realized.",
-			bg: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/182205-fRUoKv6f2JAq.jpg',
-			mobileBg: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx182205-q2AeO1owuQbO.jpg',
-			rating: '8.1',
-			format: 'TV',
-			year: '2026',
-			link: '/anime/slime-s4'
-		},
-		{
-			title: 'The Ramparts of Ice',
-			desc: 'Socially inept, Higawa Koyuki maintains a wall between herself and other people. She spends her time in high school alone, until she meets Amamiya Minato.',
-			bg: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/186497-naXtQFMHJaR1.jpg',
-			mobileBg: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx186497-uwPrNPphXvjP.jpg',
-			rating: '7.9',
-			format: 'TV',
-			year: '2026',
-			link: '/anime/the-ramparts-of-ice-gv6tby'
-		},
-		{
-			title: 'I Made Friends with the Second Prettiest Girl in My Class',
-			desc: 'Maki Maehara, the class outcast, finally makes his first friend: Umi Asanagi, the second-prettiest girl in class.',
-			bg: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/169580-RUdWWw0j74HH.jpg',
-			mobileBg: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx169580-nXxpmqu6UVux.jpg',
-			rating: '8.0',
-			format: 'TV',
-			year: '2026',
-			link: '/anime/i-made-friends-with-the-second-prettiest-girl-in-my-class-kkdghs'
-		},
-		{
-			title: 'Daemons of the Shadow Realm',
-			desc: 'In a remote mountain village under the watchful eyes of two stone guardians, the young Yuru contentedly lives off the land.',
-			bg: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/195600-UxHvDXwzJxlP.jpg',
-			mobileBg: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx195600-moI0UFArtOme.jpg',
-			rating: '7.8',
-			format: 'TV',
-			year: '2026',
-			link: '/anime/daemons-of-the-shadow-realm-y6uy28'
-		}
-	];
+	const heroSlides: HeroSlide[] = $derived.by(() => {
+		const top = animeList
+			.filter(a => a.image && a.title)
+			.sort((a, b) => b.rating - a.rating)
+			.slice(0, 4);
+		if (top.length === 0) return [];
+		return top.map(a => ({
+			title: a.title,
+			desc: a.description || `${a.title} — ${a.type} anime from ${a.year || 'Unknown'}. Genres: ${a.genres.join(', ') || 'Various'}.`,
+			bg: a.image,
+			mobileBg: a.image,
+			rating: a.rating > 0 ? a.rating.toFixed(1) : 'N/A',
+			format: a.type.replace('_', ' '),
+			year: String(a.year || ''),
+			link: `/anime/${a.id}`
+		}));
+	});
 
-	const trending = $derived(animeList.filter((a) => a.rating >= 7.5).slice(0, 10));
+	const trendingDisplay = $derived(
+		(trending.length > 0 ? trending : animeList).slice(0, 10)
+	);
 	const latest = $derived(latestEpisodes.slice(0, 12));
-	const filteredNewOnSite = $derived(newOnSite.filter((item): item is (typeof animeList)[number] => item !== undefined));
-	const filteredUpcoming = $derived(upcomingAnime.filter((item): item is (typeof animeList)[number] => item !== undefined));
+	const filteredOngoing = $derived(ongoing.filter((item): item is (typeof animeList)[number] => item !== undefined));
 	const continueWatchingList = $derived<ContinueWatchingItem[]>(
-		continueWatching
+		cwItems
 			.map((cw) => ({
 				anime: getAnimeById(cw.animeId),
-				episode:
-					cw.animeId === 'slime-s4'
-						? 'Episode 9'
-						: cw.animeId === 'botan-kamiina'
-							? 'Episode 10'
-							: 'Episode 11',
+				episode: `Episode ${getAnimeById(cw.animeId)?.totalEpisodes || getAnimeById(cw.animeId)?.episodes.length || '?'}`,
 				progress: cw.progress
 			}))
 			.filter((item): item is ContinueWatchingItem => item.anime !== undefined)
@@ -137,10 +108,40 @@
 	let currentSlide = $state(0);
 	let activeScheduleDay = $state('Monday');
 	let scheduleOffset = $state(0);
+	let showAllSchedule = $state(false);
 	let hiddenContinueWatching = $state<string[]>([]);
-	let dockOpen = $state(false);
 	let trendingTab = $state<'Day' | 'Week' | 'Month'>('Day');
 	let latestFilter = $state<'All' | 'Sub' | 'Dub'>('All');
+
+	let latestOffset = $state(0);
+	const latestPageSize = 12;
+	const latestPage = $derived(latest.slice(latestOffset, latestOffset + latestPageSize));
+
+	function goToPrevLatest() {
+		latestOffset = Math.max(0, latestOffset - latestPageSize);
+	}
+
+	function goToNextLatest() {
+		latestOffset = Math.min(
+			(latest.length - 1) - ((latest.length - 1) % latestPageSize),
+			latestOffset + latestPageSize
+		);
+	}
+
+	let ongoingOffset = $state(0);
+	const ongoingPageSize = 12;
+	const ongoingPage = $derived(filteredOngoing.slice(ongoingOffset, ongoingOffset + ongoingPageSize));
+
+	function goToPrevOngoing() {
+		ongoingOffset = Math.max(0, ongoingOffset - ongoingPageSize);
+	}
+
+	function goToNextOngoing() {
+		ongoingOffset = Math.min(
+			(filteredOngoing.length - 1) - ((filteredOngoing.length - 1) % ongoingPageSize),
+			ongoingOffset + ongoingPageSize
+		);
+	}
 
 	let filteredContinueWatching = $derived(
 		continueWatchingList.filter((item) => !hiddenContinueWatching.includes(item.anime.id))
@@ -172,19 +173,27 @@
 	}
 
 	function prevScheduleOffset() {
-		scheduleOffset = Math.max(0, scheduleOffset - 1);
+		const dayIndex = scheduleDays.indexOf(activeScheduleDay);
+		if (dayIndex > 0) {
+			activeScheduleDay = scheduleDays[dayIndex - 1];
+			if (dayIndex - 1 < scheduleOffset) {
+				scheduleOffset = Math.max(0, dayIndex - 1);
+			}
+		}
 	}
 
 	function nextScheduleOffset() {
-		scheduleOffset = Math.min(scheduleDays.length - 3, scheduleOffset + 1);
+		const dayIndex = scheduleDays.indexOf(activeScheduleDay);
+		if (dayIndex < scheduleDays.length - 1) {
+			activeScheduleDay = scheduleDays[dayIndex + 1];
+			if (dayIndex + 1 >= scheduleOffset + 3) {
+				scheduleOffset = Math.min(scheduleDays.length - 3, dayIndex + 1 - 2);
+			}
+		}
 	}
 
 	function setActiveDay(day: string) {
 		activeScheduleDay = day;
-	}
-
-	function toggleDock() {
-		dockOpen = !dockOpen;
 	}
 </script>
 
@@ -266,303 +275,6 @@
 		</div>
 	</header>
 
-	<div
-		class="fixed top-1/2 left-0 z-40 hidden -translate-y-1/2 flex-col items-start gap-0.5 lg:flex"
-	>
-		<button
-			onclick={toggleDock}
-			class="flex h-20 w-8 items-center justify-center rounded-r-lg border-y border-r border-white/[0.08] bg-[#0a0a0a]/90 text-gray-400 shadow-lg backdrop-blur-3xl transition-all duration-500 ease-out hover:w-10 hover:bg-[#0a0a0a]/98 hover:text-white"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-				class="size-5"
-			><path d={dockOpen ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'}></path></svg>
-		</button>
-		<button
-			class="flex h-8 w-8 items-center justify-center rounded-r-lg border-y border-r border-white/[0.08] bg-[#0a0a0a]/90 shadow-lg backdrop-blur-3xl transition-all duration-300 hover:w-10 hover:bg-[#0a0a0a]/98 hover:text-white text-gray-400"
-			title="Lock dock hidden"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-				class="size-3.5"
-			><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path
-					d="M7 11V7a5 5 0 0 1 9.9-1"
-				></path></svg>
-			</button>
-			<a
-				href="/my-list"
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">My List</span>
-			</a>
-			<a
-			href="https://restatus.me/"
-			target="_blank"
-			rel="noopener noreferrer"
-			class="flex h-8 w-8 items-center justify-center rounded-r-lg border-y border-r border-white/[0.08] bg-[#0a0a0a]/90 text-gray-400 shadow-lg backdrop-blur-3xl transition-all duration-300 hover:w-10 hover:bg-[#0a0a0a]/98 hover:text-white"
-			title="Status"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-				class="size-3.5"
-			><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>
-		</a>
-	</div>
-
-	<aside
-		class="fixed z-40 hidden lg:block left-4 top-1/2 -translate-y-1/2 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
-		style="transform: translateY(-50%) translateX({dockOpen ? '0' : 'calc(-100% - 2rem)'})"
-	>
-		<div
-			role="toolbar"
-			aria-label="Navigation dock"
-			tabindex="-1"
-			class="relative flex flex-col items-center gap-3 rounded-full border border-white/[0.08] bg-[#0a0a0a]/90 p-3 shadow-2xl backdrop-blur-3xl cursor-grab"
-		>
-			<button
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-white"
-				title="Home"
-			>
-				<div class="relative z-10 flex items-center justify-center" style="transform:rotate(0deg)">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-[20px] transition-transform duration-300 group-hover:scale-110"
-					><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path
-							d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-						></path></svg>
-				</div>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-4 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap text-white opacity-0 shadow-2xl backdrop-blur-3xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:translate-x-1 group-hover:opacity-100"
-				>
-					Home
-				</div>
-			</button>
-			<a
-				href="/search"
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-white/40 hover:bg-white/5 hover:text-white/90"
-				title="Search"
-			>
-				<div class="relative z-10 flex items-center justify-center" style="transform:rotate(0deg)">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-[20px] transition-transform duration-300 group-hover:scale-110"
-					><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
-				</div>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-4 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap text-white opacity-0 shadow-2xl backdrop-blur-3xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:translate-x-1 group-hover:opacity-100"
-				>
-					Search
-				</div>
-			</a>
-			<a
-				href="/schedule"
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-white/40 hover:bg-white/5 hover:text-white/90"
-				title="Schedule"
-			>
-				<div class="relative z-10 flex items-center justify-center" style="transform:rotate(0deg)">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-[20px] transition-transform duration-300 group-hover:scale-110"
-					><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path
-							d="M3 10h18"
-						></path></svg>
-				</div>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-4 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap text-white opacity-0 shadow-2xl backdrop-blur-3xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:translate-x-1 group-hover:opacity-100"
-				>
-					Schedule
-				</div>
-			</a>
-			<button
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-white/40 hover:bg-white/5 hover:text-white/90"
-				title="Community"
-			>
-				<div class="relative z-10 flex items-center justify-center" style="transform:rotate(0deg)">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-[20px] transition-transform duration-300 group-hover:scale-110"
-					><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path
-							d="M16 3.128a4 4 0 0 1 0 7.744"
-						></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
-				</div>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-4 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap text-white opacity-0 shadow-2xl backdrop-blur-3xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:translate-x-1 group-hover:opacity-100"
-				>
-					Community
-				</div>
-			</button>
-			<a
-				href="/my-list"
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-white/40 hover:bg-white/5 hover:text-white/90"
-				title="My List"
-			>
-				<div class="relative z-10 flex items-center justify-center" style="transform:rotate(0deg)">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-[20px] transition-transform duration-300 group-hover:scale-110"
-					><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
-				</div>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-4 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-3 py-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap text-white opacity-0 shadow-2xl backdrop-blur-3xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:translate-x-1 group-hover:opacity-100"
-				>
-					My List
-				</div>
-			</a>
-			<div class="h-px w-6 bg-white/[0.08]"></div>
-			<a
-				href="/settings"
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-				title="Settings"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-					class="size-[18px]"
-					style="transform:rotate(0deg)"
-				><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle
-						cx="12"
-						cy="12"
-						r="3"
-					></circle></svg>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-3 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-2.5 py-1.5 text-xs whitespace-nowrap text-white opacity-0 shadow-lg backdrop-blur-3xl transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
-				>
-					Settings
-				</div>
-			</a>
-			<a
-				href="https://restatus.me/"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="group relative z-10 flex size-[42px] items-center justify-center rounded-full transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-				title="Status"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="24"
-					height="24"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-					class="size-[18px]"
-					style="transform:rotate(0deg)"
-				><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>
-				<div
-					style="transform:rotate(0deg)"
-					class="pointer-events-none absolute left-full z-50 ml-3 rounded-lg border border-white/[0.08] bg-[#0a0a0a]/90 px-2.5 py-1.5 text-xs whitespace-nowrap text-white opacity-0 shadow-lg backdrop-blur-3xl transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
-				>
-					Status
-				</div>
-			</a>
-			<div class="h-px w-6 bg-white/[0.08]"></div>
-		</div>
-	</aside>
-
 	<main class="flex-1 pt-16 pb-0">
 		<div class="-mt-16 text-white">
 			<section class="mb-8">
@@ -594,6 +306,7 @@
 						</div>
 					{/each}
 
+					{#if heroSlides.length > 0}
 					<div class="absolute right-0 bottom-0 left-0 z-20 p-6 sm:p-10 lg:p-16">
 						<div class="max-w-2xl text-center sm:text-left">
 							<div class="mb-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
@@ -709,6 +422,7 @@
 							><path d="m9 18 6-6-6-6"></path></svg>
 						</button>
 					</div>
+					{/if}
 
 					<div class="absolute right-6 bottom-6 hidden items-center gap-2 sm:right-10 sm:bottom-10 sm:flex">
 						{#each heroSlides as slide, i}
@@ -733,7 +447,7 @@
 										<h2 class="text-lg font-bold sm:text-xl">Continue Watching</h2>
 									</div>
 									<a
-										href="/"
+										href="/continue-watching"
 										class="text-xs font-medium text-primary transition-colors hover:text-primary/80 sm:text-sm"
 									>
 										View All
@@ -830,7 +544,9 @@
 										</button>
 									</div>
 									<button
-										class="rounded border border-white/10 bg-black/40 p-1.5 text-gray-400 transition-all hover:bg-black/60 hover:text-white"
+										onclick={goToPrevLatest}
+										disabled={latestOffset === 0}
+										class="rounded border border-white/10 bg-black/40 p-1.5 text-gray-400 transition-all hover:bg-black/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -847,7 +563,9 @@
 										><path d="m15 18-6-6 6-6"></path></svg>
 									</button>
 									<button
-										class="rounded border border-white/10 bg-black/40 p-1.5 text-gray-400 transition-all hover:bg-black/60 hover:text-white"
+										onclick={goToNextLatest}
+										disabled={latestOffset + latestPageSize >= latest.length}
+										class="rounded border border-white/10 bg-black/40 p-1.5 text-gray-400 transition-all hover:bg-black/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -866,7 +584,7 @@
 								</div>
 							</div>
 							<div class="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-								{#each latest as { anime: item }}
+								{#each latestPage as { anime: item }}
 									<a
 										href="/anime/{item.id}"
 										class="group transition-all duration-300 hover:-translate-y-1"
@@ -891,7 +609,7 @@
 													aria-hidden="true"
 													class="size-3"
 												><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg>
-												<span>{item.totalEpisodes > 0 ? item.episodes.length : '?'}</span>
+												<span>{item.totalEpisodes || item.episodes.length || '?'}</span>
 											</div>
 											<div
 												class="absolute top-2 right-2 z-10 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold text-primary sm:text-xs"
@@ -919,7 +637,7 @@
 										<div class="mt-1.5 px-0.5">
 											<h3 class="line-clamp-1 text-xs font-semibold sm:text-sm">{item.title}</h3>
 											<p class="mt-0.5 text-[10px] text-gray-500 sm:text-xs">
-												{item.type.replace('_', ' ')} • EP {item.totalEpisodes > 0 ? item.episodes.length : '?'}
+												{item.type.replace('_', ' ')} • EP {item.totalEpisodes || item.episodes.length || '?'}
 											</p>
 										</div>
 									</a>
@@ -931,11 +649,51 @@
 							<div class="mb-4 flex items-center gap-3">
 								<div class="flex items-center gap-3">
 									<div class="h-6 w-1 rounded-full bg-primary"></div>
-									<h2 class="text-lg font-bold sm:text-xl">New on Site</h2>
+									<h2 class="text-lg font-bold sm:text-xl">Ongoing</h2>
+								</div>
+								<div class="ml-auto flex items-center gap-2">
+									<button
+										onclick={goToPrevOngoing}
+										disabled={ongoingOffset === 0}
+										class="rounded border border-white/10 bg-black/40 p-1.5 text-gray-400 transition-all hover:bg-black/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="24"
+											height="24"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+											class="size-4"
+										><path d="m15 18-6-6 6-6"></path></svg>
+									</button>
+									<button
+										onclick={goToNextOngoing}
+										disabled={ongoingOffset + ongoingPageSize >= filteredOngoing.length}
+										class="rounded border border-white/10 bg-black/40 p-1.5 text-gray-400 transition-all hover:bg-black/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="24"
+											height="24"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+											class="size-4"
+										><path d="m9 18 6-6-6-6"></path></svg>
+									</button>
 								</div>
 							</div>
 							<div class="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-								{#each filteredNewOnSite as item}
+								{#each ongoingPage as item}
 									<a
 										href="/anime/{item.id}"
 										class="group transition-all duration-300 hover:-translate-y-1"
@@ -971,60 +729,6 @@
 											<h3 class="line-clamp-1 text-xs font-semibold sm:text-sm">{item.title}</h3>
 											<p class="mt-0.5 text-[10px] text-gray-500 sm:text-xs">
 												{item.type.replace('_', ' ')} • {item.year}
-											</p>
-										</div>
-									</a>
-								{/each}
-							</div>
-						</section>
-
-						<section class="mb-8">
-							<div class="mb-4 flex items-center gap-3">
-								<div class="h-6 w-1 rounded-full bg-primary"></div>
-								<h2 class="text-lg font-bold sm:text-xl">Upcoming</h2>
-							</div>
-							<div class="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-								{#each filteredUpcoming as item}
-									<a
-										href="/anime/{item.id}"
-										class="group transition-all duration-300 hover:-translate-y-1"
-									>
-										<div
-											class="relative aspect-[3/4] overflow-hidden rounded-lg bg-[#141414]"
-											style="background: url({item.image}) center/cover no-repeat #141414"
-										>
-											<div
-												class="absolute top-2 right-2 z-10 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold text-primary sm:text-xs"
-											>
-												★ {item.rating > 0 ? item.rating.toFixed(1) : '?'}
-											</div>
-											<div
-												class="absolute bottom-2 left-2 z-10 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300"
-											>
-												{item.type.replace('_', ' ')}
-											</div>
-											<div
-												class="absolute inset-0 z-10 flex items-center justify-center bg-black/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-											>
-												<div
-													class="flex size-10 items-center justify-center rounded-full bg-primary shadow-[0_0_20px_rgba(0,0,0,0.5)] sm:size-12"
-												>
-													<svg
-														xmlns="http://www.w3.org/2000/svg"
-														width="24"
-														height="24"
-														viewBox="0 0 24 24"
-														fill="currentColor"
-														stroke="none"
-														class="ml-0.5 size-4 text-black sm:size-5"
-													><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg>
-												</div>
-											</div>
-										</div>
-										<div class="mt-1.5 px-0.5">
-											<h3 class="line-clamp-1 text-xs font-semibold sm:text-sm">{item.title}</h3>
-											<p class="mt-0.5 text-[10px] text-gray-500 sm:text-xs">
-												{item.type.replace('_', ' ')}
 											</p>
 										</div>
 									</a>
@@ -1074,7 +778,7 @@
 								</div>
 							</div>
 							<div class="space-y-3">
-								{#each trending as item, i}
+								{#each trendingDisplay as item, i}
 									<a
 										href="/anime/{item.id}"
 										class="group relative flex h-[100px] overflow-hidden rounded-xl border border-white/5 bg-[#0a0a0a] transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
@@ -1108,7 +812,7 @@
 													>
 													<span class="text-xs text-gray-500">{item.type.replace('_', ' ')}</span>
 													<span class="rounded bg-white/5 px-2 py-0.5 text-[10px] text-gray-400"
-														>{item.episodes.length} EP</span
+														>{item.totalEpisodes || item.episodes.length} EP</span
 													>
 												</div>
 											</div>
@@ -1192,7 +896,7 @@
 									</button>
 								</div>
 								<div class="space-y-1">
-									{#each scheduleData[activeScheduleDay].slice(0, 10) as item}
+									{#each scheduleData[activeScheduleDay].slice(0, showAllSchedule ? undefined : 10) as item}
 										<a
 											href="/anime/{item.id}"
 											class="group flex h-10 items-center justify-between rounded-lg px-4 transition-all duration-200 hover:bg-white/[0.03]"
@@ -1228,8 +932,11 @@
 									<span class="text-xs text-gray-500"
 										>{activeScheduleDay} • {scheduleData[activeScheduleDay].length} shows</span
 									>
-									<button class="text-xs font-medium text-primary transition-colors hover:text-primary/80">
-										More
+									<button
+										onclick={() => (showAllSchedule = !showAllSchedule)}
+										class="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+									>
+										{showAllSchedule ? 'Less' : 'More'}
 									</button>
 								</div>
 							</div>
@@ -1361,148 +1068,4 @@
 			</footer>
 		</div>
 	</main>
-
-	<nav
-		class="fixed right-0 bottom-0 left-0 z-[5000] border-t border-white/[0.08] bg-[#0a0a0a]/90 backdrop-blur-3xl lg:hidden"
-	>
-		<div class="flex items-center justify-around px-2 pt-2 pb-[env(safe-area-inset-bottom)] md:pb-2">
-			<button
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 bg-primary/10 text-primary"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110 scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path
-							d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-						></path></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">Home</span>
-				<div
-					class="absolute top-0 left-1/2 h-1 w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary to-primary/60"
-				></div>
-			</button>
-			<a
-				href="/search"
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">Search</span>
-			</a>
-			<a
-				href="/schedule"
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path
-							d="M3 10h18"
-						></path></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">Schedule</span>
-			</a>
-			<button
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path
-							d="M16 3.128a4 4 0 0 1 0 7.744"
-						></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">Community</span>
-			</button>
-			<a
-				href="/my-list"
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">My List</span>
-			</a>
-			<a
-				href="/settings"
-				class="group relative flex flex-col items-center gap-1 rounded-2xl px-3 pt-2.5 pb-2 transition-all duration-300 text-gray-400 hover:bg-white/10 hover:text-white"
-			>
-				<div class="relative transition-all duration-300 group-hover:scale-110">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						class="size-5"
-					><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle
-							cx="12"
-							cy="12"
-							r="3"
-						></circle></svg>
-				</div>
-				<span class="text-xs font-medium transition-colors duration-300">Settings</span>
-			</a>
-		</div>
-	</nav>
 </div>

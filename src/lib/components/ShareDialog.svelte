@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Anime } from '$lib/data/mock';
+	import { type Anime } from '$lib/data/store.svelte';
 	import { fly, fade, scale } from 'svelte/transition';
 	import { cubicOut, quintOut } from 'svelte/easing';
 

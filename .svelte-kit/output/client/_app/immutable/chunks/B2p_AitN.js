@@ -1,1 +1,0 @@
-import{Y as e}from"./B2mK20LP.js";e();

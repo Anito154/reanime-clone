@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { animeList } from '$lib/data/mock';
+	import { animeList } from '$lib/data/store.svelte';
 
 	let viewMode = $state<'grid' | 'list'>('grid');
 	let sortBy = $state('popularity');
 	let selectedGenres = $state<string[]>([]);
 
 	const allGenres = $derived([...new Set(animeList.flatMap(a => a.genres))].sort());
-	const sortedAnime = $derived(() => {
+	const sortedAnime = $derived.by(() => {
 		let list = [...animeList];
 		if (selectedGenres.length > 0) {
 			list = list.filter(a => selectedGenres.some(g => a.genres.includes(g)));
 		}
 		switch (sortBy) {
-			case 'popularity': return list.sort((a, b) => (b.episodes.length + b.rating * 10) - (a.episodes.length + a.rating * 10));
+			case 'popularity': return list.sort((a, b) => ((b.totalEpisodes || b.episodes.length) + b.rating * 10) - ((a.totalEpisodes || a.episodes.length) + a.rating * 10));
 			case 'rating': return list.sort((a, b) => b.rating - a.rating);
 			case 'year': return list.sort((a, b) => b.year - a.year);
 			case 'title': return list.sort((a, b) => a.title.localeCompare(b.title));
@@ -29,7 +29,7 @@
 	}
 </script>
 
-<div class="min-h-screen bg-[#050505] text-white">
+<div class="min-h-screen bg-[#050505] pt-16 text-white">
 	<div class="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8 xl:px-12">
 		<!-- Header -->
 		<div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -88,7 +88,7 @@
 			{#if viewMode === 'grid'}
 				<div class="flex-1">
 					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-						{#each sortedAnime() as item}
+						{#each sortedAnime as item}
 							<a href="/anime/{item.id}" class="group block">
 								<div class="relative aspect-[5/7] overflow-hidden rounded-xl bg-zinc-900">
 									<img src={item.image} alt={item.title} class="h-full w-full object-cover transition-all duration-500 group-hover:scale-110" loading="lazy" />
@@ -110,7 +110,7 @@
 								</div>
 								<div class="mt-2 px-0.5">
 									<h3 class="truncate text-xs font-semibold text-white group-hover:text-primary transition-colors">{item.title}</h3>
-									<p class="mt-0.5 text-[10px] text-zinc-500">{item.year} &middot; {item.episodes.length} ep</p>
+									<p class="mt-0.5 text-[10px] text-zinc-500">{item.year} &middot; {item.totalEpisodes || item.episodes.length} ep</p>
 								</div>
 							</a>
 						{/each}
@@ -119,9 +119,9 @@
 			{:else}
 				<!-- List View -->
 				<div class="flex-1 space-y-1">
-					{#each sortedAnime() as item}
+					{#each sortedAnime as item}
 						<a href="/anime/{item.id}" class="group flex items-center gap-4 rounded-xl px-3 py-2.5 transition-all hover:bg-white/[0.03]">
-							<div class="w-10 shrink-0 text-center text-xs font-bold text-zinc-600">{sortedAnime().indexOf(item) + 1}</div>
+							<div class="w-10 shrink-0 text-center text-xs font-bold text-zinc-600">{sortedAnime.indexOf(item) + 1}</div>
 							<div class="size-10 shrink-0 overflow-hidden rounded-lg">
 								<img src={item.image} alt={item.title} class="h-full w-full object-cover" loading="lazy" />
 							</div>
@@ -131,7 +131,7 @@
 							</div>
 							<div class="hidden shrink-0 text-xs text-zinc-500 sm:block">{item.type.replace('_', ' ')}</div>
 							<div class="hidden shrink-0 text-xs text-zinc-500 md:block">{item.year}</div>
-							<div class="hidden shrink-0 text-xs text-zinc-500 lg:block">{item.episodes.length} ep</div>
+							<div class="hidden shrink-0 text-xs text-zinc-500 lg:block">{item.totalEpisodes || item.episodes.length} ep</div>
 							<div class="flex shrink-0 items-center gap-1 text-xs font-bold text-yellow-400">
 								<svg class="size-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
 								{item.rating || '?'}
